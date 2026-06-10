@@ -90,7 +90,11 @@ const EMOJIS = ["🔥","💙","👑","🎤","🌙","💯","🙌","⚡","🎧","�
 const COVER_EMOJIS = ["🔥","🎤","👑","💿","🌙","⚡","🎵","🏆","🖤","💎","🚀","🌊","😤","🎯","💥"];
 const LINK_COLORS = ["#FFD700","#1DB954","#FC3C44","#FF0000","#69C9D0","#E1306C","#FF5500","#784FFF","#FF3CAC","#00C2FF"];
 const DROP_TYPES = ["Single","EP","Album","Mixtape","Freestyle","Collab","Remix"];
-const PASS = "aurelius1";
+const PASS_HASH = "0453dddc018515dfc2a9f9c784e905ca511d8b86f3325ef021ca310d69993a0c";
+async function checkPass(input) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("") === PASS_HASH;
+}
 
 function pad(n) { return String(n).padStart(2,"0"); }
 function fmtTime(s) { if(!s||isNaN(s)) return "0:00"; return `${Math.floor(s/60)}:${pad(Math.floor(s%60))}`; }
@@ -230,6 +234,7 @@ export default function AureliusHub() {
   // Inbox
   const [inboxUnlocked,setInboxUnlocked]=useState(false);
   const [passInput,setPassInput]=useState(""); const [passErr,setPassErr]=useState(false);
+  const [passLocked,setPassLocked]=useState(false); const [passAttempts,setPassAttempts]=useState(0);
   const [selectedMsg,setSelectedMsg]=useState(null); const [copiedAll,setCopiedAll]=useState(false);
 
   // AI
@@ -241,6 +246,7 @@ export default function AureliusHub() {
   // Admin
   const [adminUnlocked,setAdminUnlocked]=useState(false);
   const [adminPass,setAdminPass]=useState(""); const [adminPassErr,setAdminPassErr]=useState(false);
+  const [adminLocked,setAdminLocked]=useState(false); const [adminAttempts,setAdminAttempts]=useState(0);
   const [adminSection,setAdminSection]=useState("music");
   const [editingLink,setEditingLink]=useState(null); const [editingDrop,setEditingDrop]=useState(null); const [editingTrack,setEditingTrack]=useState(null);
   const [newLink,setNewLink]=useState({label:"",url:"",color:"#FFD700",active:true});
@@ -326,7 +332,15 @@ export default function AureliusHub() {
   // ── FAN SUBMIT ──
   const handleFanSubmit=async()=>{
     if(!fanMsg.trim()||!fanName.trim()) return;
-    const nm={id:uid(),name:fanName.trim(),city:fanCity.trim()||"Unknown",message:fanMsg.trim(),emoji:fanEmoji,ts:Date.now(),pinned:false};
+    // Rate limiting: max 3 submissions per 10 minutes per browser
+    const now = Date.now();
+    const key = "am_submissions";
+    const recent = JSON.parse(sessionStorage.getItem(key)||"[]").filter(t=>now-t<600000);
+    if(recent.length>=3){ alert("Too many messages. Please wait a few minutes."); return; }
+    sessionStorage.setItem(key, JSON.stringify([...recent, now]));
+    // Sanitize input - strip HTML tags and limit length
+    const sanitize = (str) => str.replace(/<[^>]*>/g,"").replace(/[<>"'`]/g,"").trim().slice(0,500);
+    const nm={id:uid(),name:sanitize(fanName).slice(0,50),city:sanitize(fanCity).slice(0,50)||"Unknown",message:sanitize(fanMsg),emoji:fanEmoji,ts:Date.now(),pinned:false};
     setMessages(p=>[nm,...p]);
     await saveMessage(nm);
     setSubmitted(true); setBurst(true); setTimeout(()=>setBurst(false),1000);
@@ -680,10 +694,10 @@ export default function AureliusHub() {
                 <div style={{fontSize:36,marginBottom:12,animation:"float 3s ease-in-out infinite"}}>🔐</div>
                 <div style={{fontFamily:"'Anton'",fontSize:17,letterSpacing:3,color:"#FFD700",marginBottom:2}}>ARTIST ONLY</div>
                 <div style={{fontSize:9,color:"#555",letterSpacing:2,marginBottom:16}}>ENTER PASSCODE</div>
-                <input className="inp" type="password" placeholder="· · · · · · · ·" value={passInput} style={{textAlign:"center",letterSpacing:4,fontSize:14,borderColor:passErr?"#FF4444":undefined}} onChange={e=>{setPassInput(e.target.value);setPassErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){if(passInput===PASS)setInboxUnlocked(true);else setPassErr(true);}}}/>
+                <input className="inp" type="password" placeholder="· · · · · · · ·" value={passInput} style={{textAlign:"center",letterSpacing:4,fontSize:14,borderColor:passErr?"#FF4444":undefined}} onChange={e=>{setPassInput(e.target.value);setPassErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){checkPass(passInput).then(ok=>{if(ok)setInboxUnlocked(true);else setPassErr(true);})}}}/>
                 {passErr&&<div style={{fontSize:9,color:"#FF4444",marginTop:5,letterSpacing:1}}>WRONG PASSCODE</div>}
-                <button className="gold-btn" style={{width:"100%",marginTop:10}} onClick={()=>{if(passInput===PASS)setInboxUnlocked(true);else setPassErr(true);}}>UNLOCK →</button>
-                <div style={{fontSize:9,color:"#333",marginTop:8}}>Default: aurelius1</div>
+                <button className="gold-btn" style={{width:"100%",marginTop:10}} disabled={passLocked} onClick={()=>{if(passLocked)return;checkPass(passInput).then(ok=>{if(ok){setPassAttempts(0);setInboxUnlocked(true);}else{const a=passAttempts+1;setPassAttempts(a);if(a>=5){setPassLocked(true);setTimeout(()=>{setPassLocked(false);setPassAttempts(0);},300000);}setPassErr(true);}});}}>{passLocked?"🔒 LOCKED 5 MIN":"UNLOCK →"}</button>
+                
               </div>
             ):(
               <div>
@@ -766,10 +780,10 @@ export default function AureliusHub() {
                 <div style={{fontFamily:"'Anton'",fontSize:17,letterSpacing:3,color:"#FFD700",marginBottom:2}}>ADMIN PANEL</div>
                 <div style={{fontSize:9,color:"#555",letterSpacing:2,marginBottom:4}}>ALL CHANGES SAVE TO CLOUD</div>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:14}}><div className="sync-dot"/><span style={{fontSize:9,color:"#555"}}>Supabase connected</span></div>
-                <input className="inp" type="password" placeholder="· · · · · · · ·" value={adminPass} style={{textAlign:"center",letterSpacing:4,fontSize:14,borderColor:adminPassErr?"#FF4444":undefined}} onChange={e=>{setAdminPass(e.target.value);setAdminPassErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){if(adminPass===PASS)setAdminUnlocked(true);else setAdminPassErr(true);}}}/>
+                <input className="inp" type="password" placeholder="· · · · · · · ·" value={adminPass} style={{textAlign:"center",letterSpacing:4,fontSize:14,borderColor:adminPassErr?"#FF4444":undefined}} onChange={e=>{setAdminPass(e.target.value);setAdminPassErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){checkPass(adminPass).then(ok=>{if(ok)setAdminUnlocked(true);else setAdminPassErr(true);})}}}/>
                 {adminPassErr&&<div style={{fontSize:9,color:"#FF4444",marginTop:5,letterSpacing:1}}>WRONG PASSCODE</div>}
-                <button className="gold-btn" style={{width:"100%",marginTop:10}} onClick={()=>{if(adminPass===PASS)setAdminUnlocked(true);else setAdminPassErr(true);}}>ENTER ADMIN →</button>
-                <div style={{fontSize:9,color:"#333",marginTop:8}}>Default: aurelius1</div>
+                <button className="gold-btn" style={{width:"100%",marginTop:10}} disabled={adminLocked} onClick={()=>{if(adminLocked)return;checkPass(adminPass).then(ok=>{if(ok){setAdminAttempts(0);setAdminUnlocked(true);}else{const a=adminAttempts+1;setAdminAttempts(a);if(a>=5){setAdminLocked(true);setTimeout(()=>{setAdminLocked(false);setAdminAttempts(0);},300000);}setAdminPassErr(true);}});}}>{adminLocked?"🔒 LOCKED 5 MIN":"ENTER ADMIN →"}</button>
+                
               </div>
             ):(
               <div>
