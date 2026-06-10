@@ -1036,10 +1036,6 @@ export default function AureliusHub() {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-        )}
 
                 {/* ── ADS ADMIN ── */}
                 {adminSection==="ads" && (
@@ -1048,49 +1044,40 @@ export default function AureliusHub() {
                       <div style={{fontSize:9,color:"#555",letterSpacing:2}}>{ads.length} ADS</div>
                       <button className="gold-btn" style={{animation:"none",padding:"7px 13px",fontSize:9}} onClick={()=>setShowNewAd(v=>!v)}>{showNewAd?"✕ CANCEL":"+ ADD AD"}</button>
                     </div>
-
                     <div className="card" style={{borderColor:"#FFD70022",marginBottom:14}}>
                       <div style={{fontSize:9,color:"#FFD700",letterSpacing:2,marginBottom:6}}>💰 HOW TO SELL ADS</div>
-                      <div style={{fontSize:10,color:"#666",lineHeight:1.7}}>
-                        Charge businesses $50–$200/month to advertise on your hub. Add their banner image, link, and CTA button below. Toggle off when the campaign ends.
-                      </div>
+                      <div style={{fontSize:10,color:"#666",lineHeight:1.7}}>Charge businesses $50–$200/month to advertise on your hub. Add their banner image, link and CTA button below. Toggle off when the campaign ends.</div>
                     </div>
-
                     {showNewAd && (
                       <div className="card" style={{borderColor:"#FFD70033",marginBottom:12,animation:"fadein .2s ease"}}>
                         <div style={{fontSize:9,color:"#FFD700",letterSpacing:2,marginBottom:10}}>NEW AD</div>
                         <div style={{display:"flex",flexDirection:"column",gap:8}}>
                           <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>ADVERTISER NAME</div><input className="inp" placeholder="Nike, Local Business..." value={newAd.title} onChange={e=>setNewAd(p=>({...p,title:e.target.value}))}/></div>
                           <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>TAGLINE</div><input className="inp" placeholder="Just Do It." value={newAd.subtitle} onChange={e=>setNewAd(p=>({...p,subtitle:e.target.value}))}/></div>
-                          <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>BANNER IMAGE URL</div><input className="inp" placeholder="https://... (jpg/png link)" value={newAd.imageUrl} onChange={e=>setNewAd(p=>({...p,imageUrl:e.target.value}))}/></div>
+                          <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>BANNER IMAGE URL</div><input className="inp" placeholder="https://... jpg/png link" value={newAd.imageUrl} onChange={e=>setNewAd(p=>({...p,imageUrl:e.target.value}))}/></div>
                           <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>DESTINATION URL</div><input className="inp" placeholder="https://advertiser-website.com" value={newAd.linkUrl} onChange={e=>setNewAd(p=>({...p,linkUrl:e.target.value}))}/></div>
-                          <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>CTA BUTTON TEXT</div><input className="inp" placeholder="SHOP NOW / LEARN MORE / BOOK NOW" value={newAd.cta} onChange={e=>setNewAd(p=>({...p,cta:e.target.value}))}/></div>
+                          <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>CTA BUTTON TEXT</div><input className="inp" placeholder="SHOP NOW / LEARN MORE" value={newAd.cta} onChange={e=>setNewAd(p=>({...p,cta:e.target.value}))}/></div>
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                             <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>BG COLOR</div><input className="inp" type="color" value={newAd.bgColor} onChange={e=>setNewAd(p=>({...p,bgColor:e.target.value}))} style={{height:40,cursor:"pointer",padding:4}}/></div>
                             <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>TEXT COLOR</div><input className="inp" type="color" value={newAd.textColor} onChange={e=>setNewAd(p=>({...p,textColor:e.target.value}))} style={{height:40,cursor:"pointer",padding:4}}/></div>
                           </div>
-                          {/* Preview */}
                           <div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>PREVIEW</div>
                           <div style={{borderRadius:12,overflow:"hidden",border:"1px solid #2C2C38",background:newAd.bgColor}}>
-                            {newAd.imageUrl && <div style={{height:80,background:`url(${newAd.imageUrl}) center/cover`,borderBottom:"1px solid #1C1C24"}}/>}
+                            {newAd.imageUrl&&<div style={{height:70,background:`url(${newAd.imageUrl}) center/cover`}}/>}
                             <div style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                              <div style={{flex:1}}>
-                                <div style={{fontFamily:"'Anton',sans-serif",fontSize:14,letterSpacing:2,color:newAd.textColor}}>{newAd.title||"Ad Title"}</div>
-                                <div style={{fontSize:9,color:newAd.textColor,opacity:.7}}>{newAd.subtitle||"Tagline here"}</div>
-                              </div>
-                              <div style={{background:newAd.textColor,color:newAd.bgColor,borderRadius:7,padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:500,letterSpacing:1,flexShrink:0}}>{newAd.cta||"LEARN MORE"}</div>
+                              <div><div style={{fontFamily:"'Anton',sans-serif",fontSize:14,letterSpacing:2,color:newAd.textColor}}>{newAd.title||"Ad Title"}</div><div style={{fontSize:9,color:newAd.textColor,opacity:.7}}>{newAd.subtitle||"Tagline"}</div></div>
+                              <div style={{background:newAd.textColor,color:newAd.bgColor,borderRadius:7,padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:500,letterSpacing:1}}>{newAd.cta||"LEARN MORE"}</div>
                             </div>
                           </div>
                           <button className="gold-btn" style={{animation:"none"}} disabled={!newAd.title.trim()} onClick={addAd}>☁️ ADD & SAVE AD</button>
                         </div>
                       </div>
                     )}
-
                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                      {ads.length===0 && <div style={{textAlign:"center",color:"#333",padding:"20px 0",fontSize:11}}>No ads yet — add your first advertiser above.</div>}
+                      {ads.length===0&&<div style={{textAlign:"center",color:"#333",padding:"20px 0",fontSize:11}}>No ads yet — add your first advertiser above.</div>}
                       {ads.map(ad=>(
                         <div key={ad.id}>
-                          {editingAd?.id===ad.id ? (
+                          {editingAd?.id===ad.id?(
                             <div className="card" style={{borderColor:"#FFD70033",animation:"fadein .2s ease"}}>
                               <div style={{fontSize:9,color:"#FFD700",letterSpacing:2,marginBottom:10}}>EDITING AD</div>
                               <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -1113,12 +1100,12 @@ export default function AureliusHub() {
                                 </div>
                               </div>
                             </div>
-                          ) : (
+                          ):(
                             <div style={{background:"#0A0A0C",border:`1px solid ${ad.active?"#FFD70022":"#1C1C24"}`,borderRadius:11,padding:"11px 13px",display:"flex",gap:10,alignItems:"center"}}>
-                              <div style={{width:36,height:36,borderRadius:9,background:ad.bgColor||"#111",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0,border:"1px solid #1C1C24"}}>📢</div>
+                              <div style={{width:36,height:36,borderRadius:9,background:ad.bgColor||"#111",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>📢</div>
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:11,color:ad.active?"#ccc":"#444",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ad.title}</div>
-                                <div style={{fontSize:9,color:"#555",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ad.linkUrl||"No link set"} · {ad.active?"🟢 LIVE":"⚫ OFF"}</div>
+                                <div style={{fontSize:9,color:"#555"}}>{ad.active?"🟢 LIVE":"⚫ OFF"} · {ad.linkUrl||"No link"}</div>
                               </div>
                               <Toggle on={ad.active} onChange={()=>toggleAd(ad.id)}/>
                               <button className="ghost" style={{padding:"5px 9px",flexShrink:0}} onClick={()=>setEditingAd({...ad})}>✏️</button>
@@ -1137,7 +1124,7 @@ export default function AureliusHub() {
         )}
       </div>
 
-      {/* ══ AD BANNER — BOTTOM ══ */}
+      {/* ══ AD BANNER BOTTOM ══ */}
       {ads.filter(a=>a.active).length > 0 && (
         <div style={{padding:"0 16px 28px",maxWidth:520,margin:"0 auto"}}>
           <div style={{fontSize:8,color:"#2C2C2C",letterSpacing:2,textAlign:"center",marginBottom:8}}>SPONSORED</div>
@@ -1146,17 +1133,13 @@ export default function AureliusHub() {
               style={{display:"block",textDecoration:"none",borderRadius:14,overflow:"hidden",border:"1px solid #1C1C24",background:ad.bgColor||"#111118",marginBottom:10,transition:"transform .2s"}}
               onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
               onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
-              {ad.imageUrl && (
-                <img src={ad.imageUrl} alt={ad.title} style={{width:"100%",height:130,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
-              )}
+              {ad.imageUrl&&<img src={ad.imageUrl} alt={ad.title} style={{width:"100%",height:130,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>}
               <div style={{padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontFamily:"'Anton',sans-serif",fontSize:17,letterSpacing:2,color:ad.textColor||"#FFD700",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ad.title}</div>
                   {ad.subtitle&&<div style={{fontSize:10,color:ad.textColor||"#FFD700",opacity:.7,marginTop:2}}>{ad.subtitle}</div>}
                 </div>
-                <div style={{background:ad.textColor||"#FFD700",color:ad.bgColor||"#000",borderRadius:8,padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:500,letterSpacing:1.5,flexShrink:0,whiteSpace:"nowrap"}}>
-                  {ad.cta||"LEARN MORE"}
-                </div>
+                <div style={{background:ad.textColor||"#FFD700",color:ad.bgColor||"#000",borderRadius:8,padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:500,letterSpacing:1.5,flexShrink:0,whiteSpace:"nowrap"}}>{ad.cta||"LEARN MORE"}</div>
               </div>
             </a>
           ))}
