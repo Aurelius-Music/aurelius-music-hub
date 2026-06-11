@@ -610,7 +610,10 @@ export default function AureliusHub() {
               </div>
             </div>
             <div className="card" style={{borderColor:"#FFD70022"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}><span style={{fontSize:14}}>🤖</span><div style={{fontSize:10,color:"#FFD700",fontWeight:500,letterSpacing:1}}>AI HYPE CAPTION</div></div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14}}>🤖</span><div style={{fontSize:10,color:"#FFD700",fontWeight:500,letterSpacing:1}}>AI HYPE CAPTION</div></div>
+                <div style={{fontSize:8,color:import.meta.env.VITE_ANTHROPIC_KEY?"#1DB954":"#FF4444",letterSpacing:1}}>{import.meta.env.VITE_ANTHROPIC_KEY?"🟢 API READY":"🔴 NO API KEY"}</div>
+              </div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                 {HYPE_STYLES.map(s=><button key={s.id} className={`ghost${hypeStyle===s.id?" on":""}`} onClick={()=>setHypeStyle(s.id)}>{s.label}</button>)}
               </div>
