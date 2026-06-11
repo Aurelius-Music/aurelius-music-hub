@@ -295,6 +295,7 @@ export default function AureliusHub() {
   },[settings.releaseDate]);
 
   // Flash helper
+  useEffect(()=>{ console.log("API Key loaded:", import.meta.env.VITE_ANTHROPIC_KEY ? "YES ✅" : "NO ❌"); },[]);
   const flash=(msg="✓ SAVED TO CLOUD")=>{setSavedFlash(msg);setTimeout(()=>setSavedFlash(""),2000);};
 
   // ── SAVE HELPERS ──
@@ -362,7 +363,7 @@ export default function AureliusHub() {
     try{
       const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are ${settings.artistName}, an independent Hip-Hop/Rap artist. Reply to a fan. Tone: ${toneMap[tone]}. Authentic. 2-4 sentences. Sign off as ${settings.artistName}.`,messages:[{role:"user",content:`Fan: ${fanMessage.name} (${fanMessage.city}): "${fanMessage.message}"\n\nWrite my reply.`}]})});
       const data=await res.json(); setAiReply(data.content?.[0]?.text||"Couldn't generate. Try again.");
-    }catch{setAiReply("Network error — try again.");}
+    }catch(err){setAiReply("Error: " + (err?.message||"Unknown. Check API key in Vercel settings."));}
     setAiLoading(false);
   };
   const generateHype=async(style)=>{
@@ -372,7 +373,7 @@ export default function AureliusHub() {
     try{
       const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are a music marketing expert for ${settings.artistName}. Write ${styleMap[style]}. Authentic and exciting. Return only the caption.`,messages:[{role:"user",content:`Release: "${settings.releaseName}". Status: ${timeStr}. Write the caption.`}]})});
       const data=await res.json(); setHypeMsg(data.content?.[0]?.text||"Couldn't generate.");
-    }catch{setHypeMsg("Network error.");}
+    }catch(err){setHypeMsg("Error: " + (err?.message||"Unknown. Check API key in Vercel settings."));}
     setHypeLoading(false);
   };
 
