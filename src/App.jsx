@@ -90,7 +90,7 @@ const EMOJIS = ["🔥","💙","👑","🎤","🌙","💯","🙌","⚡","🎧","�
 const COVER_EMOJIS = ["🔥","🎤","👑","💿","🌙","⚡","🎵","🏆","🖤","💎","🚀","🌊","😤","🎯","💥"];
 const LINK_COLORS = ["#FFD700","#1DB954","#FC3C44","#FF0000","#69C9D0","#E1306C","#FF5500","#784FFF","#FF3CAC","#00C2FF"];
 const DROP_TYPES = ["Single","EP","Album","Mixtape","Freestyle","Collab","Remix"];
-const PASS_HASH = "85df744de0833a58412ad0addabf7225a1b4cbb906d7c21f78ea49a4142041a4";
+const PASS_HASH = "0453dddc018515dfc2a9f9c784e905ca511d8b86f3325ef021ca310d69993a0c";
 async function checkPass(input) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("") === PASS_HASH;
@@ -360,7 +360,7 @@ export default function AureliusHub() {
     setAiLoading(true);setAiReply("");
     const toneMap={hype:"hype and energetic, like a grateful rapper",humble:"humble and heartfelt",funny:"funny and witty",short:"1-2 sentences, punchy"};
     try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are ${settings.artistName}, an independent Hip-Hop/Rap artist. Reply to a fan. Tone: ${toneMap[tone]}. Authentic. 2-4 sentences. Sign off as ${settings.artistName}.`,messages:[{role:"user",content:`Fan: ${fanMessage.name} (${fanMessage.city}): "${fanMessage.message}"\n\nWrite my reply.`}]})});
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are ${settings.artistName}, an independent Hip-Hop/Rap artist. Reply to a fan. Tone: ${toneMap[tone]}. Authentic. 2-4 sentences. Sign off as ${settings.artistName}.`,messages:[{role:"user",content:`Fan: ${fanMessage.name} (${fanMessage.city}): "${fanMessage.message}"\n\nWrite my reply.`}]})});
       const data=await res.json(); setAiReply(data.content?.[0]?.text||"Couldn't generate. Try again.");
     }catch{setAiReply("Network error — try again.");}
     setAiLoading(false);
@@ -370,7 +370,7 @@ export default function AureliusHub() {
     const styleMap={tiktok:"a TikTok caption, lowercase, casual, with emojis and hashtags #fyp #hiphop #newmusic",instagram:"an Instagram caption, hype and polished, with emojis and hashtags",twitter:"a punchy Twitter/X post under 200 chars, no hashtags",sms:"a personal text blast to fans, casual, no hashtags"};
     const timeStr=released?"just dropped NOW":countdown.d===0?"dropping TODAY":`dropping in ${countdown.d} day${countdown.d!==1?"s":""}`;
     try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are a music marketing expert for ${settings.artistName}. Write ${styleMap[style]}. Authentic and exciting. Return only the caption.`,messages:[{role:"user",content:`Release: "${settings.releaseName}". Status: ${timeStr}. Write the caption.`}]})});
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are a music marketing expert for ${settings.artistName}. Write ${styleMap[style]}. Authentic and exciting. Return only the caption.`,messages:[{role:"user",content:`Release: "${settings.releaseName}". Status: ${timeStr}. Write the caption.`}]})});
       const data=await res.json(); setHypeMsg(data.content?.[0]?.text||"Couldn't generate.");
     }catch{setHypeMsg("Network error.");}
     setHypeLoading(false);
