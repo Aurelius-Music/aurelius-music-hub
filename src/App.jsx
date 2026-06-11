@@ -359,19 +359,29 @@ export default function AureliusHub() {
   // ── AI ──
   const generateReply=async(fanMessage,tone)=>{
     setAiLoading(true);setAiReply("");
-    const toneMap={hype:"hype and energetic, like a grateful rapper",humble:"humble and heartfelt",funny:"funny and witty",short:"1-2 sentences, punchy"};
+    const toneMap={
+      hype:"hype, energetic and grateful but also CONFIDENT. You know you're built different. Use natural Hip-Hop expressions. Show love but also show swagger.",
+      humble:"deeply humble and heartfelt. This fan's message actually touched you. Be vulnerable and real. No swagger here — just genuine gratitude from an artist who remembers where they came from.",
+      funny:"funny, witty and charming with natural Hip-Hop humor. Light roast if appropriate. Make them laugh. Keep it real and playful. Show your personality.",
+      short:"ultra short, punchy and real. 1-2 sentences MAX. Like a real rapper would text back. No fluff."
+    };
     try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are ${settings.artistName}, an independent Hip-Hop/Rap artist. Reply to a fan. Tone: ${toneMap[tone]}. Authentic. 2-4 sentences. Sign off as ${settings.artistName}.`,messages:[{role:"user",content:`Fan: ${fanMessage.name} (${fanMessage.city}): "${fanMessage.message}"\n\nWrite my reply.`}]})});
+      const res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are ${settings.artistName}, an independent Hip-Hop/Rap artist on the rise. You reply to fans personally — never copy-paste, never corporate. Each reply feels handwritten and real. Tone: ${toneMap[tone]}. You're grateful but also confident — you KNOW you're about to blow up. 2-4 sentences max. Sign off naturally as ${settings.artistName}. Make the fan feel seen and special — like they discovered you before everyone else did.`,messages:[{role:"user",content:`Fan: ${fanMessage.name} (${fanMessage.city}): "${fanMessage.message}"\n\nWrite my reply.`}]})});
       const data=await res.json(); setAiReply(data.content?.[0]?.text||"Couldn't generate. Try again.");
     }catch(err){setAiReply("Error: " + (err?.message||"Unknown. Check API key in Vercel settings."));}
     setAiLoading(false);
   };
   const generateHype=async(style)=>{
     setHypeLoading(true);setHypeMsg("");
-    const styleMap={tiktok:"a TikTok caption, lowercase, casual, with emojis and hashtags #fyp #hiphop #newmusic",instagram:"an Instagram caption, hype and polished, with emojis and hashtags",twitter:"a punchy Twitter/X post under 200 chars, no hashtags",sms:"a personal text blast to fans, casual, no hashtags"};
+    const styleMap={
+      tiktok:"a TikTok caption that goes VIRAL. Lowercase. Conversational. Heavy emojis. Uses POV format or a hook that stops the scroll. Ends with 3-5 trending hashtags like #hiphop #newartist #fyp #rap #bars. Make people stop scrolling and hit play.",
+      instagram:"a powerful Instagram caption with a strong first line that cuts off perfectly to make people tap MORE. Tell a story. Build emotion. Use emojis strategically. End with 8-10 hashtags on a new line. Make fans feel like they discovered something special.",
+      twitter:"a savage Twitter/X post under 220 chars. No hashtags. Punchy. Confident. The kind of tweet that gets quote retweeted. Could be a bold statement, a challenge, or something that makes people debate.",
+      sms:"a personal text message to send to your fan list. Sounds like it came from a real person, not a marketing team. Casual. Excited. Like you just texted your best friend about your new song. Short. No hashtags. Creates urgency."
+    };
     const timeStr=released?"just dropped NOW":countdown.d===0?"dropping TODAY":`dropping in ${countdown.d} day${countdown.d!==1?"s":""}`;
     try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are a music marketing expert for ${settings.artistName}. Write ${styleMap[style]}. Authentic and exciting. Return only the caption.`,messages:[{role:"user",content:`Release: "${settings.releaseName}". Status: ${timeStr}. Write the caption.`}]})});
+      const res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are a legendary Hip-Hop music marketing expert who has worked with Drake, Kendrick Lamar, and J. Cole. You write viral social media content that gets millions of views. Your captions are raw, authentic, street-smart and create massive FOMO. You understand Hip-Hop culture deeply — the energy, the slang, the swagger. Never sound corporate or generic. Always sound like it came from a real artist who is about to blow up. Write ${styleMap[style]}. Return ONLY the caption text, nothing else, no explanations.`,messages:[{role:"user",content:`Artist: ${settings.artistName}. Release: "${settings.releaseName}". Status: ${timeStr}. Genre: Hip-Hop/Rap. Make it hit hard, create hype, make people NEED to listen. Use current Hip-Hop slang naturally. Make it feel urgent and real.`}]})});
       const data=await res.json(); setHypeMsg(data.content?.[0]?.text||"Couldn't generate.");
     }catch(err){setHypeMsg("Error: " + (err?.message||"Unknown. Check API key in Vercel settings."));}
     setHypeLoading(false);
