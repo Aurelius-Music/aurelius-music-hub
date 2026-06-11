@@ -82,6 +82,7 @@ const DEFAULT_SETTINGS = {
   releaseDate: (() => { const d = new Date(); d.setDate(d.getDate() + 14); return d.toISOString().slice(0, 16); })(),
 };
 
+
 const DEFAULT_ADS = [
   { id: "ad1", title: "Advertise Here", subtitle: "Reach Aurelius Music fans worldwide", imageUrl: "", linkUrl: "", bgColor: "#111118", textColor: "#FFD700", active: true, cta: "GET IN TOUCH" },
 ];
@@ -89,7 +90,11 @@ const EMOJIS = ["🔥","💙","👑","🎤","🌙","💯","🙌","⚡","🎧","�
 const COVER_EMOJIS = ["🔥","🎤","👑","💿","🌙","⚡","🎵","🏆","🖤","💎","🚀","🌊","😤","🎯","💥"];
 const LINK_COLORS = ["#FFD700","#1DB954","#FC3C44","#FF0000","#69C9D0","#E1306C","#FF5500","#784FFF","#FF3CAC","#00C2FF"];
 const DROP_TYPES = ["Single","EP","Album","Mixtape","Freestyle","Collab","Remix"];
-const PASS = "aurelius1";
+const PASS_HASH = "0453dddc018515dfc2a9f9c784e905ca511d8b86f3325ef021ca310d69993a0c";
+async function checkPass(input) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("") === PASS_HASH;
+}
 
 function pad(n) { return String(n).padStart(2,"0"); }
 function fmtTime(s) { if(!s||isNaN(s)) return "0:00"; return `${Math.floor(s/60)}:${pad(Math.floor(s%60))}`; }
@@ -101,6 +106,7 @@ function timeAgo(ts) {
   return `${Math.floor(d/86400000)}d ago`;
 }
 function uid() { return `id_${Date.now()}_${Math.random().toString(36).slice(2,7)}`; }
+
 // ─── YOUTUBE EMBED PLAYER ────────────────────────────────────────────────────
 function YTPlayer({ track }) {
   if (!track) return null;
@@ -205,6 +211,7 @@ export default function AureliusHub() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("player");
   const [syncing, setSyncing] = useState(false);
+
   // Data
   const [links, setLinks] = useState(DEFAULT_LINKS);
   const [drops, setDrops] = useState(DEFAULT_DROPS);
@@ -227,6 +234,7 @@ export default function AureliusHub() {
   // Inbox
   const [inboxUnlocked,setInboxUnlocked]=useState(false);
   const [passInput,setPassInput]=useState(""); const [passErr,setPassErr]=useState(false);
+  const [passLocked,setPassLocked]=useState(false); const [passAttempts,setPassAttempts]=useState(0);
   const [selectedMsg,setSelectedMsg]=useState(null); const [copiedAll,setCopiedAll]=useState(false);
 
   // AI
@@ -238,6 +246,7 @@ export default function AureliusHub() {
   // Admin
   const [adminUnlocked,setAdminUnlocked]=useState(false);
   const [adminPass,setAdminPass]=useState(""); const [adminPassErr,setAdminPassErr]=useState(false);
+  const [adminLocked,setAdminLocked]=useState(false); const [adminAttempts,setAdminAttempts]=useState(0);
   const [adminSection,setAdminSection]=useState("music");
   const [editingLink,setEditingLink]=useState(null); const [editingDrop,setEditingDrop]=useState(null); const [editingTrack,setEditingTrack]=useState(null);
   const [newLink,setNewLink]=useState({label:"",url:"",color:"#FFD700",active:true});
@@ -286,6 +295,7 @@ export default function AureliusHub() {
   },[settings.releaseDate]);
 
   // Flash helper
+  useEffect(()=>{ console.log("API Key loaded:", import.meta.env.VITE_ANTHROPIC_KEY ? "YES ✅" : "NO ❌"); },[]);
   const flash=(msg="✓ SAVED TO CLOUD")=>{setSavedFlash(msg);setTimeout(()=>setSavedFlash(""),2000);};
 
   // ── SAVE HELPERS ──
@@ -323,7 +333,15 @@ export default function AureliusHub() {
   // ── FAN SUBMIT ──
   const handleFanSubmit=async()=>{
     if(!fanMsg.trim()||!fanName.trim()) return;
-    const nm={id:uid(),name:fanName.trim(),city:fanCity.trim()||"Unknown",message:fanMsg.trim(),emoji:fanEmoji,ts:Date.now(),pinned:false};
+    // Rate limiting: max 3 submissions per 10 minutes per browser
+    const now = Date.now();
+    const key = "am_submissions";
+    const recent = JSON.parse(sessionStorage.getItem(key)||"[]").filter(t=>now-t<600000);
+    if(recent.length>=3){ alert("Too many messages. Please wait a few minutes."); return; }
+    sessionStorage.setItem(key, JSON.stringify([...recent, now]));
+    // Sanitize input - strip HTML tags and limit length
+    const sanitize = (str) => str.replace(/<[^>]*>/g,"").replace(/[<>"'`]/g,"").trim().slice(0,500);
+    const nm={id:uid(),name:sanitize(fanName).slice(0,50),city:sanitize(fanCity).slice(0,50)||"Unknown",message:sanitize(fanMsg),emoji:fanEmoji,ts:Date.now(),pinned:false};
     setMessages(p=>[nm,...p]);
     await saveMessage(nm);
     setSubmitted(true); setBurst(true); setTimeout(()=>setBurst(false),1000);
@@ -341,22 +359,76 @@ export default function AureliusHub() {
   // ── AI ──
   const generateReply=async(fanMessage,tone)=>{
     setAiLoading(true);setAiReply("");
-    const toneMap={hype:"hype and energetic, like a grateful rapper",humble:"humble and heartfelt",funny:"funny and witty",short:"1-2 sentences, punchy"};
+    const toneMap={
+      hype:"hype, energetic and grateful but also CONFIDENT. You know you're built different. Use natural Hip-Hop expressions. Show love but also show swagger.",
+      humble:"deeply humble and heartfelt. This fan's message actually touched you. Be vulnerable and real. No swagger here — just genuine gratitude from an artist who remembers where they came from.",
+      funny:"funny, witty and charming with natural Hip-Hop humor. Light roast if appropriate. Make them laugh. Keep it real and playful. Show your personality.",
+      short:"ultra short, punchy and real. 1-2 sentences MAX. Like a real rapper would text back. No fluff."
+    };
     try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are ${settings.artistName}, an independent Hip-Hop/Rap artist. Reply to a fan. Tone: ${toneMap[tone]}. Authentic. 2-4 sentences. Sign off as ${settings.artistName}.`,messages:[{role:"user",content:`Fan: ${fanMessage.name} (${fanMessage.city}): "${fanMessage.message}"\n\nWrite my reply.`}]})});
+      const res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are ${settings.artistName}, an independent Hip-Hop/Rap artist on the rise. You reply to fans personally — never copy-paste, never corporate. Each reply feels handwritten and real. Tone: ${toneMap[tone]}. You're grateful but also confident — you KNOW you're about to blow up. 2-4 sentences max. Sign off naturally as ${settings.artistName}. Make the fan feel seen and special — like they discovered you before everyone else did.`,messages:[{role:"user",content:`Fan: ${fanMessage.name} (${fanMessage.city}): "${fanMessage.message}"\n\nWrite my reply.`}]})});
       const data=await res.json(); setAiReply(data.content?.[0]?.text||"Couldn't generate. Try again.");
-    }catch{setAiReply("Network error — try again.");}
+    }catch(err){setAiReply("Error: " + (err?.message||"Unknown. Check API key in Vercel settings."));}
     setAiLoading(false);
   };
-  const generateHype=async(style)=>{
+  const generateHype=(style)=>{
     setHypeLoading(true);setHypeMsg("");
-    const styleMap={tiktok:"a TikTok caption, lowercase, casual, with emojis and hashtags #fyp #hiphop #newmusic",instagram:"an Instagram caption, hype and polished, with emojis and hashtags",twitter:"a punchy Twitter/X post under 200 chars, no hashtags",sms:"a personal text blast to fans, casual, no hashtags"};
-    const timeStr=released?"just dropped NOW":countdown.d===0?"dropping TODAY":`dropping in ${countdown.d} day${countdown.d!==1?"s":""}`;
-    try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:`You are a music marketing expert for ${settings.artistName}. Write ${styleMap[style]}. Authentic and exciting. Return only the caption.`,messages:[{role:"user",content:`Release: "${settings.releaseName}". Status: ${timeStr}. Write the caption.`}]})});
-      const data=await res.json(); setHypeMsg(data.content?.[0]?.text||"Couldn't generate.");
-    }catch{setHypeMsg("Network error.");}
-    setHypeLoading(false);
+    const name = settings.artistName;
+    const release = settings.releaseName;
+    const timeStr = released ? "out now" : countdown.d===0 ? "dropping TODAY" : `dropping in ${countdown.d} day${countdown.d!==1?"s":""}`;
+
+    const captions = {
+      tiktok: [
+        `pov: you just found your next favorite rapper 🔥 ${name} just dropped "${release}" and it's not a game anymore… #hiphop #newartist #fyp #rap #bars`,
+        `they told him wait his turn. he didn't. 😤 "${release}" by ${name} is ${timeStr} — go stream it NOW 🎧 #fyp #hiphop #newrap #undiscovered`,
+        `i don't say this lightly but this might be the hardest thing i've heard all year 🥶 ${name} - "${release}" ${timeStr} #hiphop #fyp #rap #newmusic`,
+        `the ones who find ${name} right now are gonna say they knew before everyone 👀 "${release}" ${timeStr} #fyp #hiphop #bars #newartist`,
+      ],
+      instagram: [
+        `"${release}" is ${timeStr}.
+
+This one wasn't made for the charts. It was made for the ones who feel everything deeply and say nothing. You know who you are.
+
+Stream link in bio. 🖤
+
+#${name.replace(/\s/g,"")} #HipHop #NewMusic #Rap #IndependentArtist #NewRelease #Bars #HipHopMusic #Rapper #Unsigned`,
+        `They sleep on the ones who are building in silence. 😤
+
+"${release}" ${timeStr}. No features. No label. Just bars.
+
+Link in bio — go show love. 🎧
+
+#HipHop #Rap #NewArtist #${name.replace(/\s/g,"")} #IndieRap #NewMusic #Bars #Grind #Unsigned #HipHopCommunity`,
+        `I made "${release}" for the ones who never gave up even when nobody was watching. 🔥
+
+It's ${timeStr}. Stream it. Share it. Let's go. 🚀
+
+Link in bio.
+
+#NewMusic #HipHop #Rap #${name.replace(/\s/g,"")} #NewRelease #Bars #Rapper #Independent #Grind #MusicIsLife`,
+      ],
+      twitter: [
+        `"${release}" ${timeStr}. I been quiet. Now it's time to talk. 🎤`,
+        `not asking for streams. just asking you to listen once. "${release}" ${timeStr}. that's all i need. 🖤`,
+        `every rapper says they're different. i'll let "${release}" speak for itself. ${timeStr}.`,
+        `built different. "${release}" ${timeStr}. screenshot this tweet. 😤`,
+      ],
+      sms: [
+        `Yo it's ${name}! Just wanted to personally let you know "${release}" is ${timeStr}. You've been rocking with me and I don't take that lightly. Go stream it and tell me what you think 🎧🔥`,
+        `Hey! ${name} here. "${release}" is ${timeStr} and I made this one for real ones like you. Stream it, share it, let's make some noise together 🙏🔥`,
+        `${name} here — "${release}" is ${timeStr}!! Been working on this for a minute. You're one of the first to hear it. Go stream it and lmk what you think 🎤`,
+      ],
+    };
+
+    const options = captions[style] || captions.tiktok;
+    const picked = options[Math.floor(Math.random() * options.length)]
+      .replace(/\[RELEASE\]/g, release)
+      .replace(/\[ARTIST\]/g, name);
+
+    setTimeout(() => {
+      setHypeMsg(picked);
+      setHypeLoading(false);
+    }, 800);
   };
 
   // ── ADMIN SAVE HELPERS ──
@@ -477,6 +549,7 @@ export default function AureliusHub() {
         {/* ══ PLAYER ══ */}
         {tab==="player" && (
           <div style={{animation:"fadein .3s ease"}}>
+
             {/* Now Playing */}
             {ct ? (
               <div style={{background:"linear-gradient(135deg,#0C0C14,#0A0A10)",border:"1px solid #FFD70022",borderRadius:20,padding:20,marginBottom:18}}>
@@ -591,7 +664,10 @@ export default function AureliusHub() {
               </div>
             </div>
             <div className="card" style={{borderColor:"#FFD70022"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}><span style={{fontSize:14}}>🤖</span><div style={{fontSize:10,color:"#FFD700",fontWeight:500,letterSpacing:1}}>AI HYPE CAPTION</div></div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14}}>🤖</span><div style={{fontSize:10,color:"#FFD700",fontWeight:500,letterSpacing:1}}>AI HYPE CAPTION</div></div>
+                <div style={{fontSize:8,color:import.meta.env.VITE_ANTHROPIC_KEY?"#1DB954":"#FF4444",letterSpacing:1}}>{import.meta.env.VITE_ANTHROPIC_KEY?"🟢 API READY":"🔴 NO API KEY"}</div>
+              </div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                 {HYPE_STYLES.map(s=><button key={s.id} className={`ghost${hypeStyle===s.id?" on":""}`} onClick={()=>setHypeStyle(s.id)}>{s.label}</button>)}
               </div>
@@ -676,10 +752,10 @@ export default function AureliusHub() {
                 <div style={{fontSize:36,marginBottom:12,animation:"float 3s ease-in-out infinite"}}>🔐</div>
                 <div style={{fontFamily:"'Anton'",fontSize:17,letterSpacing:3,color:"#FFD700",marginBottom:2}}>ARTIST ONLY</div>
                 <div style={{fontSize:9,color:"#555",letterSpacing:2,marginBottom:16}}>ENTER PASSCODE</div>
-                <input className="inp" type="password" placeholder="· · · · · · · ·" value={passInput} style={{textAlign:"center",letterSpacing:4,fontSize:14,borderColor:passErr?"#FF4444":undefined}} onChange={e=>{setPassInput(e.target.value);setPassErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){if(passInput===PASS)setInboxUnlocked(true);else setPassErr(true);}}}/>
+                <input className="inp" type="password" placeholder="· · · · · · · ·" value={passInput} style={{textAlign:"center",letterSpacing:4,fontSize:14,borderColor:passErr?"#FF4444":undefined}} onChange={e=>{setPassInput(e.target.value);setPassErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){checkPass(passInput).then(ok=>{if(ok)setInboxUnlocked(true);else setPassErr(true);})}}}/>
                 {passErr&&<div style={{fontSize:9,color:"#FF4444",marginTop:5,letterSpacing:1}}>WRONG PASSCODE</div>}
-                <button className="gold-btn" style={{width:"100%",marginTop:10}} onClick={()=>{if(passInput===PASS)setInboxUnlocked(true);else setPassErr(true);}}>UNLOCK →</button>
-                <div style={{fontSize:9,color:"#333",marginTop:8}}>Default: aurelius1</div>
+                <button className="gold-btn" style={{width:"100%",marginTop:10}} disabled={passLocked} onClick={()=>{if(passLocked)return;checkPass(passInput).then(ok=>{if(ok){setPassAttempts(0);setInboxUnlocked(true);}else{const a=passAttempts+1;setPassAttempts(a);if(a>=5){setPassLocked(true);setTimeout(()=>{setPassLocked(false);setPassAttempts(0);},300000);}setPassErr(true);}});}}>{passLocked?"🔒 LOCKED 5 MIN":"UNLOCK →"}</button>
+                
               </div>
             ):(
               <div>
@@ -762,10 +838,10 @@ export default function AureliusHub() {
                 <div style={{fontFamily:"'Anton'",fontSize:17,letterSpacing:3,color:"#FFD700",marginBottom:2}}>ADMIN PANEL</div>
                 <div style={{fontSize:9,color:"#555",letterSpacing:2,marginBottom:4}}>ALL CHANGES SAVE TO CLOUD</div>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:14}}><div className="sync-dot"/><span style={{fontSize:9,color:"#555"}}>Supabase connected</span></div>
-                <input className="inp" type="password" placeholder="· · · · · · · ·" value={adminPass} style={{textAlign:"center",letterSpacing:4,fontSize:14,borderColor:adminPassErr?"#FF4444":undefined}} onChange={e=>{setAdminPass(e.target.value);setAdminPassErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){if(adminPass===PASS)setAdminUnlocked(true);else setAdminPassErr(true);}}}/>
+                <input className="inp" type="password" placeholder="· · · · · · · ·" value={adminPass} style={{textAlign:"center",letterSpacing:4,fontSize:14,borderColor:adminPassErr?"#FF4444":undefined}} onChange={e=>{setAdminPass(e.target.value);setAdminPassErr(false);}} onKeyDown={e=>{if(e.key==="Enter"){checkPass(adminPass).then(ok=>{if(ok)setAdminUnlocked(true);else setAdminPassErr(true);})}}}/>
                 {adminPassErr&&<div style={{fontSize:9,color:"#FF4444",marginTop:5,letterSpacing:1}}>WRONG PASSCODE</div>}
-                <button className="gold-btn" style={{width:"100%",marginTop:10}} onClick={()=>{if(adminPass===PASS)setAdminUnlocked(true);else setAdminPassErr(true);}}>ENTER ADMIN →</button>
-                <div style={{fontSize:9,color:"#333",marginTop:8}}>Default: aurelius1</div>
+                <button className="gold-btn" style={{width:"100%",marginTop:10}} disabled={adminLocked} onClick={()=>{if(adminLocked)return;checkPass(adminPass).then(ok=>{if(ok){setAdminAttempts(0);setAdminUnlocked(true);}else{const a=adminAttempts+1;setAdminAttempts(a);if(a>=5){setAdminLocked(true);setTimeout(()=>{setAdminLocked(false);setAdminAttempts(0);},300000);}setAdminPassErr(true);}});}}>{adminLocked?"🔒 LOCKED 5 MIN":"ENTER ADMIN →"}</button>
+                
               </div>
             ):(
               <div>
@@ -1032,10 +1108,6 @@ export default function AureliusHub() {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-        )}
 
                 {/* ── ADS ADMIN ── */}
                 {adminSection==="ads" && (
@@ -1044,49 +1116,40 @@ export default function AureliusHub() {
                       <div style={{fontSize:9,color:"#555",letterSpacing:2}}>{ads.length} ADS</div>
                       <button className="gold-btn" style={{animation:"none",padding:"7px 13px",fontSize:9}} onClick={()=>setShowNewAd(v=>!v)}>{showNewAd?"✕ CANCEL":"+ ADD AD"}</button>
                     </div>
-
                     <div className="card" style={{borderColor:"#FFD70022",marginBottom:14}}>
                       <div style={{fontSize:9,color:"#FFD700",letterSpacing:2,marginBottom:6}}>💰 HOW TO SELL ADS</div>
-                      <div style={{fontSize:10,color:"#666",lineHeight:1.7}}>
-                        Charge businesses $50–$200/month to advertise on your hub. Add their banner image, link, and CTA button below. Toggle off when the campaign ends.
-                      </div>
+                      <div style={{fontSize:10,color:"#666",lineHeight:1.7}}>Charge businesses $50–$200/month to advertise on your hub. Add their banner image, link and CTA button below. Toggle off when the campaign ends.</div>
                     </div>
-
                     {showNewAd && (
                       <div className="card" style={{borderColor:"#FFD70033",marginBottom:12,animation:"fadein .2s ease"}}>
                         <div style={{fontSize:9,color:"#FFD700",letterSpacing:2,marginBottom:10}}>NEW AD</div>
                         <div style={{display:"flex",flexDirection:"column",gap:8}}>
                           <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>ADVERTISER NAME</div><input className="inp" placeholder="Nike, Local Business..." value={newAd.title} onChange={e=>setNewAd(p=>({...p,title:e.target.value}))}/></div>
                           <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>TAGLINE</div><input className="inp" placeholder="Just Do It." value={newAd.subtitle} onChange={e=>setNewAd(p=>({...p,subtitle:e.target.value}))}/></div>
-                          <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>BANNER IMAGE URL</div><input className="inp" placeholder="https://... (jpg/png link)" value={newAd.imageUrl} onChange={e=>setNewAd(p=>({...p,imageUrl:e.target.value}))}/></div>
+                          <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>BANNER IMAGE URL</div><input className="inp" placeholder="https://... jpg/png link" value={newAd.imageUrl} onChange={e=>setNewAd(p=>({...p,imageUrl:e.target.value}))}/></div>
                           <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>DESTINATION URL</div><input className="inp" placeholder="https://advertiser-website.com" value={newAd.linkUrl} onChange={e=>setNewAd(p=>({...p,linkUrl:e.target.value}))}/></div>
-                          <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>CTA BUTTON TEXT</div><input className="inp" placeholder="SHOP NOW / LEARN MORE / BOOK NOW" value={newAd.cta} onChange={e=>setNewAd(p=>({...p,cta:e.target.value}))}/></div>
+                          <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>CTA BUTTON TEXT</div><input className="inp" placeholder="SHOP NOW / LEARN MORE" value={newAd.cta} onChange={e=>setNewAd(p=>({...p,cta:e.target.value}))}/></div>
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                             <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>BG COLOR</div><input className="inp" type="color" value={newAd.bgColor} onChange={e=>setNewAd(p=>({...p,bgColor:e.target.value}))} style={{height:40,cursor:"pointer",padding:4}}/></div>
                             <div><div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>TEXT COLOR</div><input className="inp" type="color" value={newAd.textColor} onChange={e=>setNewAd(p=>({...p,textColor:e.target.value}))} style={{height:40,cursor:"pointer",padding:4}}/></div>
                           </div>
-                          {/* Preview */}
                           <div style={{fontSize:8,color:"#555",letterSpacing:2,marginBottom:4}}>PREVIEW</div>
                           <div style={{borderRadius:12,overflow:"hidden",border:"1px solid #2C2C38",background:newAd.bgColor}}>
-                            {newAd.imageUrl && <div style={{height:80,background:`url(${newAd.imageUrl}) center/cover`,borderBottom:"1px solid #1C1C24"}}/>}
+                            {newAd.imageUrl&&<div style={{height:70,background:`url(${newAd.imageUrl}) center/cover`}}/>}
                             <div style={{padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                              <div style={{flex:1}}>
-                                <div style={{fontFamily:"'Anton',sans-serif",fontSize:14,letterSpacing:2,color:newAd.textColor}}>{newAd.title||"Ad Title"}</div>
-                                <div style={{fontSize:9,color:newAd.textColor,opacity:.7}}>{newAd.subtitle||"Tagline here"}</div>
-                              </div>
-                              <div style={{background:newAd.textColor,color:newAd.bgColor,borderRadius:7,padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:500,letterSpacing:1,flexShrink:0}}>{newAd.cta||"LEARN MORE"}</div>
+                              <div><div style={{fontFamily:"'Anton',sans-serif",fontSize:14,letterSpacing:2,color:newAd.textColor}}>{newAd.title||"Ad Title"}</div><div style={{fontSize:9,color:newAd.textColor,opacity:.7}}>{newAd.subtitle||"Tagline"}</div></div>
+                              <div style={{background:newAd.textColor,color:newAd.bgColor,borderRadius:7,padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:500,letterSpacing:1}}>{newAd.cta||"LEARN MORE"}</div>
                             </div>
                           </div>
                           <button className="gold-btn" style={{animation:"none"}} disabled={!newAd.title.trim()} onClick={addAd}>☁️ ADD & SAVE AD</button>
                         </div>
                       </div>
                     )}
-
                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                      {ads.length===0 && <div style={{textAlign:"center",color:"#333",padding:"20px 0",fontSize:11}}>No ads yet — add your first advertiser above.</div>}
+                      {ads.length===0&&<div style={{textAlign:"center",color:"#333",padding:"20px 0",fontSize:11}}>No ads yet — add your first advertiser above.</div>}
                       {ads.map(ad=>(
                         <div key={ad.id}>
-                          {editingAd?.id===ad.id ? (
+                          {editingAd?.id===ad.id?(
                             <div className="card" style={{borderColor:"#FFD70033",animation:"fadein .2s ease"}}>
                               <div style={{fontSize:9,color:"#FFD700",letterSpacing:2,marginBottom:10}}>EDITING AD</div>
                               <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -1109,12 +1172,12 @@ export default function AureliusHub() {
                                 </div>
                               </div>
                             </div>
-                          ) : (
+                          ):(
                             <div style={{background:"#0A0A0C",border:`1px solid ${ad.active?"#FFD70022":"#1C1C24"}`,borderRadius:11,padding:"11px 13px",display:"flex",gap:10,alignItems:"center"}}>
-                              <div style={{width:36,height:36,borderRadius:9,background:ad.bgColor||"#111",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0,border:"1px solid #1C1C24"}}>📢</div>
+                              <div style={{width:36,height:36,borderRadius:9,background:ad.bgColor||"#111",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>📢</div>
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:11,color:ad.active?"#ccc":"#444",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ad.title}</div>
-                                <div style={{fontSize:9,color:"#555",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ad.linkUrl||"No link set"} · {ad.active?"🟢 LIVE":"⚫ OFF"}</div>
+                                <div style={{fontSize:9,color:"#555"}}>{ad.active?"🟢 LIVE":"⚫ OFF"} · {ad.linkUrl||"No link"}</div>
                               </div>
                               <Toggle on={ad.active} onChange={()=>toggleAd(ad.id)}/>
                               <button className="ghost" style={{padding:"5px 9px",flexShrink:0}} onClick={()=>setEditingAd({...ad})}>✏️</button>
@@ -1133,7 +1196,7 @@ export default function AureliusHub() {
         )}
       </div>
 
-      {/* ══ AD BANNER — BOTTOM ══ */}
+      {/* ══ AD BANNER BOTTOM ══ */}
       {ads.filter(a=>a.active).length > 0 && (
         <div style={{padding:"0 16px 28px",maxWidth:520,margin:"0 auto"}}>
           <div style={{fontSize:8,color:"#2C2C2C",letterSpacing:2,textAlign:"center",marginBottom:8}}>SPONSORED</div>
@@ -1142,17 +1205,13 @@ export default function AureliusHub() {
               style={{display:"block",textDecoration:"none",borderRadius:14,overflow:"hidden",border:"1px solid #1C1C24",background:ad.bgColor||"#111118",marginBottom:10,transition:"transform .2s"}}
               onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
               onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
-              {ad.imageUrl && (
-                <img src={ad.imageUrl} alt={ad.title} style={{width:"100%",height:130,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
-              )}
+              {ad.imageUrl&&<img src={ad.imageUrl} alt={ad.title} style={{width:"100%",height:130,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>}
               <div style={{padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontFamily:"'Anton',sans-serif",fontSize:17,letterSpacing:2,color:ad.textColor||"#FFD700",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ad.title}</div>
                   {ad.subtitle&&<div style={{fontSize:10,color:ad.textColor||"#FFD700",opacity:.7,marginTop:2}}>{ad.subtitle}</div>}
                 </div>
-                <div style={{background:ad.textColor||"#FFD700",color:ad.bgColor||"#000",borderRadius:8,padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:500,letterSpacing:1.5,flexShrink:0,whiteSpace:"nowrap"}}>
-                  {ad.cta||"LEARN MORE"}
-                </div>
+                <div style={{background:ad.textColor||"#FFD700",color:ad.bgColor||"#000",borderRadius:8,padding:"8px 14px",fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:500,letterSpacing:1.5,flexShrink:0,whiteSpace:"nowrap"}}>{ad.cta||"LEARN MORE"}</div>
               </div>
             </a>
           ))}
