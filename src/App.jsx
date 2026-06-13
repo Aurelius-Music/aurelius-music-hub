@@ -90,7 +90,7 @@ const EMOJIS = ["🔥","💙","👑","🎤","🌙","💯","🙌","⚡","🎧","�
 const COVER_EMOJIS = ["🔥","🎤","👑","💿","🌙","⚡","🎵","🏆","🖤","💎","🚀","🌊","😤","🎯","💥"];
 const LINK_COLORS = ["#FFD700","#1DB954","#FC3C44","#FF0000","#69C9D0","#E1306C","#FF5500","#784FFF","#FF3CAC","#00C2FF"];
 const DROP_TYPES = ["Single","EP","Album","Mixtape","Freestyle","Collab","Remix"];
-const PASS_HASH = "0453dddc018515dfc2a9f9c784e905ca511d8b86f3325ef021ca310d69993a0c";
+const PASS_HASH = "85df744de0833a58412ad0addabf7225a1b4cbb906d7c21f78ea49a4142041a4";
 async function checkPass(input) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("") === PASS_HASH;
